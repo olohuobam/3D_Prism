@@ -6,7 +6,7 @@ import { useGLTF, MeshTransmissionMaterial } from '@react-three/drei'
 import { DoubleSide } from 'three'
 
 export default function Prism() {
-  const { nodes } = useGLTF('/prism1.glb')
+  const { nodes } = useGLTF('/prism3.glb')
 
   return (
     <mesh geometry={nodes.Cube.geometry} scale={[0.6, .9, 0.6]}
@@ -32,4 +32,4 @@ export default function Prism() {
   )
 }
 
-useGLTF.preload('/prism1.glb')
+useGLTF.preload('/prism3.glb')
