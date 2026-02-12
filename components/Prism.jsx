@@ -185,11 +185,11 @@ export default function Prism({ scrollProgress = 0 }) {
   ], [])
   
   // Animation targets - sections 2 and 3 move perpendicular to the cuts
-  // Direction: parallel to the right edge (which is the cut direction)
+  // Section 2 moves top-left, Section 3 moves bottom-right
   const segmentTargets = useMemo(() => [
     { posX: 0, posY: 0 },         // Section 1: STAYS PUT
-    { posX: 0.6, posY: -1.2 },    // Section 2: slides along right-edge direction ↘
-    { posX: -0.6, posY: 1.2 },    // Section 3: slides opposite direction ↖
+    { posX: -0.6, posY: 1.2 },    // Section 2: slides TOP-LEFT ↖
+    { posX: 0.6, posY: -1.2 },    // Section 3: slides BOTTOM-RIGHT ↘
     { posX: 0, posY: 0 },         // Section 4: STAYS PUT
   ], [])
   
