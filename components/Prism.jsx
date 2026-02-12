@@ -1,5 +1,6 @@
 'use client'
 import React, { useRef, useMemo } from 'react'
+import { useTexture } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -159,6 +160,8 @@ function createSection4(leftT, depth = 1) {
 }
 
 export default function Prism({ scrollProgress = 0 }) {
+  const matcap = useTexture('/matcap.png')
+  
   const groupRef = useRef()
   const seg1Ref = useRef()
   const seg2Ref = useRef()
@@ -220,19 +223,19 @@ export default function Prism({ scrollProgress = 0 }) {
     <group ref={groupRef} position={[0, 0, 0]} scale={[1.2, 1.2, 1.2]}>
       {/* Single prism made of 4 angled slices */}
       <mesh ref={seg1Ref} geometry={sliceGeometries[0]}>
-        <meshBasicMaterial color="#ff6600" side={THREE.DoubleSide} />
+        <meshMatcapMaterial matcap={matcap} transparent opacity={0.9} side={THREE.DoubleSide} />
       </mesh>
       
       <mesh ref={seg2Ref} geometry={sliceGeometries[1]}>
-        <meshBasicMaterial color="#ff6600" side={THREE.DoubleSide} />
+        <meshMatcapMaterial matcap={matcap} transparent opacity={0.9} side={THREE.DoubleSide} />
       </mesh>
       
       <mesh ref={seg3Ref} geometry={sliceGeometries[2]}>
-        <meshBasicMaterial color="#ff6600" side={THREE.DoubleSide} />
+        <meshMatcapMaterial matcap={matcap} transparent opacity={0.9} side={THREE.DoubleSide} />
       </mesh>
       
       <mesh ref={seg4Ref} geometry={sliceGeometries[3]}>
-        <meshBasicMaterial color="#ff6600" side={THREE.DoubleSide} />
+        <meshMatcapMaterial matcap={matcap} transparent opacity={0.9} side={THREE.DoubleSide} />
       </mesh>
     </group>
   )
