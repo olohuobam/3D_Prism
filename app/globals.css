@@ -4,6 +4,7 @@ html, body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  background: #0F021F;
 }
 
 .scroll-container {
@@ -11,8 +12,9 @@ html, body {
   width: 100%;
 }
 
+/* Tall enough for 3 animation phases */
 .scroll-space {
-  height: 200vh;
+  height: 300vh;
   pointer-events: none;
 }
 
@@ -23,4 +25,41 @@ html, body {
   width: 100%;
   height: 100vh;
   z-index: 1;
+}
+
+/* Subtle scroll progress indicator */
+.scroll-hint {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(180, 160, 255, 0.6);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-family: monospace;
+  pointer-events: none;
+  animation: fadeHint 2s ease-in-out infinite;
+}
+
+.scroll-hint-arrow {
+  width: 1px;
+  height: 2rem;
+  background: linear-gradient(to bottom, transparent, rgba(180, 160, 255, 0.6));
+  animation: arrowPulse 2s ease-in-out infinite;
+}
+
+@keyframes fadeHint {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.9; }
+}
+
+@keyframes arrowPulse {
+  0% { transform: scaleY(0.6) translateY(-8px); opacity: 0.3; }
+  100% { transform: scaleY(1.0) translateY(0px); opacity: 0.8; }
 }
