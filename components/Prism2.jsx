@@ -7,85 +7,79 @@ import * as THREE from 'three'
 function lerp(a, b, t) { return a + (b - a) * t }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 function remap(v, a, b, c, d) { return lerp(c, d, clamp((v - a) / (b - a), 0, 1)) }
+function easeOutExpo(t) { return t === 1 ? 1 : 1 - Math.pow(2, -10 * t) }
+function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2 }
 
-function easeOutExpo(t) {
-  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
-}
-function easeInOutCubic(t) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-}
-
-// The final assembled prism appears as phase2 (scroll 0.65→1.0) progresses.
-// It starts scattered (large offset, scattered rotation) and converges
-// to its resting position — giving the "breaking before joining" effect.
+// ── SCROLL PHASES ────────────────────────────────────────────────────────────
+// 0.00 → 0.40  Phase 1: Prism2 appears small, grows to full size
+// 0.40 → 0.65  Phase 2: breaks into X-shape (two diagonal halves slide apart)
+// 0.65 → 0.85  Phase 3: X pieces fade out → Prism scan plane assembles
 
 export default function Prism2({ scrollProgress = 0 }) {
-  const meshRef = useRef()
+  const meshARef = useRef() // top-left piece of the X
+  const meshBRef = useRef() // bottom-right piece of the X
   const { nodes } = useGLTF('/prism3.glb')
   const matcap = useTexture('/matcap.png')
 
-  // phase2: 0 at scroll=0.65, 1 at scroll=1.0
-  // breakT: how far into the break (0.50→0.70)
-  const phase2 = remap(scrollProgress, 0.65, 1.0, 0, 1)
-  const breakT = remap(scrollProgress, 0.50, 0.70, 0, 1)
-
   useFrame(() => {
-    if (!meshRef.current) return
+    if (!meshARef.current || !meshBRef.current) return
 
-    const assembleT = easeOutExpo(clamp(phase2, 0, 1))
+    // Phase timings
+    const growT  = easeOutExpo(remap(scrollProgress, 0, 0.40, 0, 1))
+    const breakT = easeInOutCubic(remap(scrollProgress, 0.40, 0.65, 0, 1))
+    const fadeT  = remap(scrollProgress, 0.65, 0.85, 0, 1)
 
-    // Invisible until break phase is well underway
-    const visible = scrollProgress >= 0.62
-    meshRef.current.visible = visible
+    // Scale: tiny → full
+    const baseScale = lerp(0.15, 1.0, growT)
 
-    if (!visible) return
+    // X-break: pieces slide diagonally apart
+    const breakDist = lerp(0, 0.85, breakT)
 
-    // Start scattered far away, converge to final position
-    // "Assembles" like pieces flying inward to form the shape
-    const scatterT = 1 - assembleT
+    // Opacity: fade in with grow, fade out during phase 3
+    const opacity = clamp((1 - fadeT) * clamp(growT * 3, 0, 1), 0, 1)
 
-    // Position: comes in from slight offset
-    meshRef.current.position.x = lerp(-1 + scatterT * 1.5, -1, assembleT)
-    meshRef.current.position.y = lerp(0  + scatterT * 0.8,  0, assembleT)
-    meshRef.current.position.z = lerp(0  - scatterT * 2.0,  0, assembleT)
+    const show = opacity > 0.01
 
-    // Rotation: spins in to final rotation
-    meshRef.current.rotation.y = lerp(
-      Math.PI / 2 + scatterT * Math.PI * 1.5,
-      Math.PI / 2,
-      assembleT
+    // ── Piece A: slides UP-RIGHT ──────────────────────────────────────────
+    meshARef.current.visible = show
+    meshARef.current.scale.set(0.6 * baseScale, 0.9 * baseScale, 0.6 * baseScale)
+    meshARef.current.position.set(
+      -1 + breakDist * 0.6,
+       0 + breakDist * 0.6,
+       0 + breakDist * 0.15
     )
-    meshRef.current.rotation.x = lerp(scatterT * 0.8, 0, assembleT)
-    meshRef.current.rotation.z = lerp(scatterT * 0.5, 0, assembleT)
+    meshARef.current.rotation.set(
+       breakT * 0.18,
+       Math.PI / 2 + breakT * 0.14,
+       breakT * 0.10
+    )
+    if (meshARef.current.material) meshARef.current.material.opacity = opacity
 
-    // Scale: starts slightly small, pops to full
-    const scaleBase = lerp(0.3, 1, assembleT)
-    const scaleWobble = 1 + Math.sin(assembleT * Math.PI) * 0.08 * (1 - assembleT)
-    const s = scaleBase * scaleWobble
-    meshRef.current.scale.set(0.6 * s, 0.9 * s, 0.6 * s)
-
-    // Opacity: fades in as it assembles
-    if (meshRef.current.material) {
-      meshRef.current.material.opacity = clamp(assembleT * 1.5, 0, 1)
-    }
+    // ── Piece B: slides DOWN-LEFT ─────────────────────────────────────────
+    meshBRef.current.visible = show
+    meshBRef.current.scale.set(0.6 * baseScale, 0.9 * baseScale, 0.6 * baseScale)
+    meshBRef.current.position.set(
+      -1 - breakDist * 0.6,
+       0 - breakDist * 0.6,
+       0 - breakDist * 0.15
+    )
+    meshBRef.current.rotation.set(
+      -breakT * 0.18,
+       Math.PI / 2 - breakT * 0.14,
+      -breakT * 0.10
+    )
+    if (meshBRef.current.material) meshBRef.current.material.opacity = opacity
   })
 
   return (
-    <mesh
-      ref={meshRef}
-      geometry={nodes.Cube.geometry}
-      scale={[0.6, 0.9, 0.6]}
-      rotation={[0, Math.PI / 2, 0]}
-      position={[-1, 0, 0]}
-      visible={false}
-    >
-      <meshMatcapMaterial
-        matcap={matcap}
-        transparent
-        opacity={0}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
+    <>
+      <mesh ref={meshARef} geometry={nodes.Cube.geometry} visible={false}>
+        <meshMatcapMaterial matcap={matcap} transparent opacity={0} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh ref={meshBRef} geometry={nodes.Cube.geometry} visible={false}>
+        <meshMatcapMaterial matcap={matcap} transparent opacity={0} side={THREE.DoubleSide} />
+      </mesh>
+    </>
   )
 }
 

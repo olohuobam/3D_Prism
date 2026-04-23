@@ -28,11 +28,6 @@ const Scene = () => {
   const [scrollProgress, setScrollProgress] = useState(0)
   const handleScroll = useCallback((p) => setScrollProgress(p), [])
 
-  // Phase breakdown:
-  // 0.00 → 0.45  : View 1 (Prism) — scanning plane + projection lines
-  // 0.45 → 0.65  : Break transition — fragments fly apart
-  // 0.65 → 1.00  : View 2 (Prism2) — assembles from fragments
-
   return (
     <>
       <ScrollTracker onScrollProgress={handleScroll} />
@@ -42,9 +37,10 @@ const Scene = () => {
           <ambientLight intensity={1} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
           <Environment preset='sunset' />
-          <OrbitControls enableZoom={false} enableRotate={false} />
-          <Prism scrollProgress={scrollProgress} />
+          {/* Prism2: Phase 1 (grow) + Phase 2 (X-break) */}
           <Prism2 scrollProgress={scrollProgress} />
+          {/* Prism: Phase 3 (scan plane assembles) */}
+          <Prism scrollProgress={scrollProgress} />
         </Canvas>
       </div>
     </>
