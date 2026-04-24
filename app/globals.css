@@ -9,7 +9,6 @@ html, body {
   padding: 0;
   overflow-x: hidden;
   background: #0F021F;
-  /* Smooth momentum scrolling on iOS */
   -webkit-overflow-scrolling: touch;
 }
 
@@ -18,7 +17,6 @@ html, body {
   width: 100%;
 }
 
-/* Tall enough for 3 animation phases */
 .scroll-space {
   height: 300vh;
   pointer-events: none;
@@ -29,16 +27,13 @@ html, body {
   top: 0;
   left: 0;
   width: 100%;
-  /* Use dvh for mobile (accounts for browser chrome) */
-  height: 100dvh;
-  height: 100vh; /* fallback */
+  height: 100vh;
+  height: 100dvh; /* dvh AFTER vh so it overrides on supporting browsers */
   z-index: 1;
-  /* Prevent any tap highlight / touch delay */
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Canvas fills wrapper perfectly */
 .scene-wrapper canvas {
   display: block;
   width: 100% !important;
@@ -46,7 +41,6 @@ html, body {
   touch-action: pan-y;
 }
 
-/* Scroll hint */
 .scroll-hint {
   position: fixed;
   bottom: 2rem;
@@ -83,7 +77,6 @@ html, body {
   100% { transform: scaleY(1.0) translateY(0px);  opacity: 0.8; }
 }
 
-/* Hide scroll hint once user has scrolled */
 @media (max-width: 768px) {
   .scroll-hint {
     bottom: 1.2rem;
