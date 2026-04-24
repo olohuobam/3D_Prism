@@ -1,5 +1,5 @@
 'use client'
-import React, { useRef, useMemo } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { useGLTF, useTexture } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -11,14 +11,15 @@ function easeOutExpo(t) { return t === 1 ? 1 : 1 - Math.pow(2, -10 * t) }
 function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2 }
 
 // ── SCROLL PHASES ──────────────────────────────────────────────────────────
-// 0.00 → 0.45  Phase 1: meshA only (single prism) grows small → full
-// 0.45 → 0.70  Phase 2: meshA slides UP-RIGHT, meshB fades in DOWN-LEFT (X break)
-// 0.70 → 0.85  Both fade out
-// 0.85 → 1.00  Phase 3: scan plane + square projection
+// 0.00 → 0.45  Phase 1: ONE prism (meshA only) grows small → full
+// 0.45 → 0.70  Phase 2: meshA slides UP-RIGHT, meshB fades in sliding DOWN-LEFT
+//              meshB opacity starts at 0 and rises — seamless split from one
+// 0.70 → 0.85  Both fade out → scan + square projection appear
+// 0.85 → 1.00  Phase 3 full
 
-export default function Prism2({ scrollProgress = 0, viewportWidth = 1024 }) {
-  const meshARef       = useRef()
-  const meshBRef       = useRef()
+export default function Prism2({ scrollProgress = 0 }) {
+  const meshARef       = useRef()   // the ONE prism — also becomes top-right piece
+  const meshBRef       = useRef()   // bottom-left piece — only fades IN during break
   const scanRef        = useRef()
   const squarePlaneRef = useRef()
   const bottomRef      = useRef()
@@ -26,15 +27,15 @@ export default function Prism2({ scrollProgress = 0, viewportWidth = 1024 }) {
   const gltf   = useGLTF('/prism3.glb')
   const matcap = useTexture('/matcap.png')
 
-  // Responsive values derived from viewportWidth prop (from Three.js canvas size)
-  const isMobile  = viewportWidth < 768
-  const isSmall   = viewportWidth < 480
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
-  // Scale multipliers per breakpoint
-  const maxScale   = isSmall ? 0.70 : isMobile ? 0.82 : 1.0
-  const breakMax   = isSmall ? 0.45 : isMobile ? 0.55 : 0.80
-
-  const prismGeo = useMemo(() => {
+  const prismGeo = React.useMemo(() => {
     const first = Object.values(gltf.nodes).find(n => n.isMesh && n.geometry)
     return first?.geometry ?? null
   }, [gltf.nodes])
@@ -53,7 +54,7 @@ export default function Prism2({ scrollProgress = 0, viewportWidth = 1024 }) {
     return geo
   })())
 
-  const bottomFaceGeo = useMemo(() => {
+  const bottomFaceGeo = React.useMemo(() => {
     const h = 0.53
     const v = new Float32Array([-1,-1,h, 1,-1,h, 1,-1,-h, -1,-1,-h])
     const idx = new Uint16Array([0,1,2,0,2,3])
@@ -70,42 +71,52 @@ export default function Prism2({ scrollProgress = 0, viewportWidth = 1024 }) {
   useFrame((state) => {
     const time = state.clock.elapsedTime
 
-    const growT  = easeOutExpo(remap(scrollProgress, 0,    0.45, 0, 1))
-    const breakT = easeInOutCubic(remap(scrollProgress, 0.45, 0.70, 0, 1))
-    const fadeT  = remap(scrollProgress, 0.70, 0.85, 0, 1)
+    // Phase timings
+    const growT  = easeOutExpo(remap(scrollProgress, 0,    0.45, 0, 1))  // phase 1 grow
+    const breakT = easeInOutCubic(remap(scrollProgress, 0.45, 0.70, 0, 1)) // phase 2 break
+    const fadeT  = remap(scrollProgress, 0.70, 0.85, 0, 1)                // fade out
     const phase3 = remap(scrollProgress, 0.70, 1.00, 0, 1)
     const p3ease = easeOutExpo(phase3)
 
-    const baseScale = lerp(0.08, maxScale, growT)
-    const breakDist = lerp(0, breakMax, breakT)
-    const fadeOut   = clamp(1 - fadeT * 2, 0, 1)
+    const maxS      = isMobile ? 0.85 : 1.0
+    const baseScale = lerp(0.08, maxS, growT)
+    const breakDist = lerp(0, isMobile ? 0.60 : 0.80, breakT)
 
-    // ── meshA: single prism in phase 1, slides UP-RIGHT in phase 2 ─────────
+    // Shared fade-out multiplier once phase3 begins
+    const fadeOut = clamp(1 - fadeT * 2, 0, 1)
+
+    // ── meshA: the ONLY prism in phase 1 ──────────────────────────────────
+    // In phase 1: sits at center (0,0,0), no offset
+    // In phase 2: starts sliding UP-RIGHT as breakDist grows
+    // It is ALWAYS visible from scroll=0, never hidden until fadeOut
     if (meshARef.current) {
       const opA = clamp(growT * 4, 0, 1) * fadeOut
       meshARef.current.visible = opA > 0.005
       meshARef.current.scale.set(0.6 * baseScale, 0.9 * baseScale, 0.6 * baseScale)
       meshARef.current.position.set(
-        breakDist * 0.55,
-        breakDist * 0.55,
-        breakDist * 0.12
+         breakDist * 0.55,   // 0 during phase1, grows during break
+         breakDist * 0.55,
+         breakDist * 0.12
       )
       meshARef.current.rotation.set(
-        breakT * 0.18,
-        Math.PI / 2 + breakT * 0.14,
-        breakT * 0.10
+         breakT * 0.18,
+         Math.PI / 2 + breakT * 0.14,
+         breakT * 0.10
       )
       if (meshARef.current.material)
         meshARef.current.material.opacity = opA
     }
 
-    // ── meshB: invisible in phase 1, fades in during phase 2, DOWN-LEFT ────
+    // ── meshB: INVISIBLE in phase 1, fades IN during phase 2 only ─────────
+    // opacity = 0 until break starts, then rises to match meshA
+    // This means: at break start meshB fades in FROM the same spot as meshA
+    // giving the illusion it "projects from" the fading single prism
     if (meshBRef.current) {
-      const opB = clamp(breakT * 3, 0, 1) * fadeOut
+      const opB = clamp(breakT * 3, 0, 1) * fadeOut  // 0 until break, then rises
       meshBRef.current.visible = opB > 0.005
       meshBRef.current.scale.set(0.6 * baseScale, 0.9 * baseScale, 0.6 * baseScale)
       meshBRef.current.position.set(
-        -breakDist * 0.55,
+        -breakDist * 0.55,   // mirrors A, slides DOWN-LEFT
         -breakDist * 0.55,
         -breakDist * 0.12
       )
@@ -118,8 +129,8 @@ export default function Prism2({ scrollProgress = 0, viewportWidth = 1024 }) {
         meshBRef.current.material.opacity = opB
     }
 
-    // ── Phase 3: scan + square ─────────────────────────────────────────────
-    const ps = 0.9 * baseScale
+    // ── Phase 3: scan plane + square projection ────────────────────────────
+    const ps = 0.9 * baseScale * (isMobile ? 0.85 : 1.0)
 
     if (scanRef.current) {
       const raw   = (Math.sin(time * 0.6 - Math.PI / 2) + 1) / 2
@@ -168,20 +179,29 @@ export default function Prism2({ scrollProgress = 0, viewportWidth = 1024 }) {
 
   return (
     <>
+      {/* meshA: the single prism in phase 1, becomes top-right piece in phase 2 */}
       <mesh ref={meshARef} geometry={prismGeo} visible={false}>
         <meshMatcapMaterial matcap={matcap} transparent opacity={0} side={THREE.DoubleSide} />
       </mesh>
+
+      {/* meshB: invisible in phase 1, fades in from center during phase 2 break */}
       <mesh ref={meshBRef} geometry={prismGeo} visible={false}>
         <meshMatcapMaterial matcap={matcap} transparent opacity={0} side={THREE.DoubleSide} />
       </mesh>
+
+      {/* Phase 3: pink scan plane */}
       <mesh ref={scanRef} geometry={scanGeo.current} renderOrder={2} visible={false}>
         <meshBasicMaterial color={0xff40b0} transparent opacity={0}
           side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
+
+      {/* Phase 3: cyan square projection */}
       <mesh ref={squarePlaneRef} geometry={squareGeo.current} renderOrder={3} visible={false}>
         <meshBasicMaterial color={0x40d0ff} transparent opacity={0}
           side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
+
+      {/* Phase 3: base glow */}
       <mesh ref={bottomRef} geometry={bottomFaceGeo} renderOrder={1} visible={false}>
         <meshBasicMaterial color={0x66aaff} transparent opacity={0}
           side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
